@@ -4,6 +4,7 @@ from itertools import groupby
 from typing import Callable, Dict, List, Optional, Set, Tuple, Type, Union
 
 import numpy as np
+import random
 import PIL
 import torch
 import torch.nn as nn
@@ -534,7 +535,6 @@ def convert_loras_to_safeloras(
 ):
     convert_loras_to_safeloras_with_embeds(modelmap=modelmap, outpath=outpath)
 
-
 def parse_safeloras(
     safeloras,
 ) -> Dict[str, Tuple[List[nn.parameter.Parameter], List[int], List[str]]]:
@@ -590,6 +590,55 @@ def parse_safeloras(
             # Insert the weight into the list
             idx = idx * 2 + (1 if direction == "down" else 0)
             weights[idx] = nn.parameter.Parameter(safeloras.get_tensor(key))
+
+        loras[name] = (weights, ranks, target)
+
+    return loras
+
+
+def dict_to_lora(tensor_dict, metadata):
+    """
+    Converts a dictionary of tensors + metadata into a Lora
+    """
+    loras = {}
+
+    get_name = lambda k: k.split(":")[0]
+
+    keys = list(tensor_dict.keys())
+    keys.sort(key=get_name)
+
+    for name, module_keys in groupby(keys, get_name):
+        info = metadata.get(name)
+
+        if not info:
+            raise ValueError(
+                f"Tensor {name} has no metadata - is this a Lora safetensor?"
+            )
+
+        # Skip Textual Inversion embeds
+        if info == EMBED_FLAG:
+            continue
+
+        # Handle Loras
+        # Extract the targets
+        target = json.loads(info)
+
+        # Build the result lists - Python needs us to preallocate lists to insert into them
+        module_keys = list(module_keys)
+        ranks = [4] * (len(module_keys) // 2)
+        weights = [None] * len(module_keys)
+
+        for key in module_keys:
+            # Split the model name and index out of the key
+            _, idx, direction = key.split(":")
+            idx = int(idx)
+
+            # Add the rank
+            ranks[idx] = int(metadata[f"{name}:{idx}:rank"])
+
+            # Insert the weight into the list
+            idx = idx * 2 + (1 if direction == "down" else 0)
+            weights[idx] = nn.parameter.Parameter(tensor_dict[key])
 
         loras[name] = (weights, ranks, target)
 
@@ -801,7 +850,7 @@ def monkeypatch_or_replace_safeloras(models, safeloras):
 
     for name, (lora, ranks, target) in loras.items():
         model = getattr(models, name, None)
-
+        
         if not model:
             print(f"No model provided for {name}, contained in Lora")
             continue
@@ -914,7 +963,7 @@ def apply_learned_embed_in_clip(
         trained_tokens = list(learned_embeds.keys())
 
     for token in trained_tokens:
-        print(token)
+        print("Adding new token: ", token)
         embeds = learned_embeds[token]
 
         # cast to dtype of text_encoder
@@ -1028,17 +1077,19 @@ def inspect_lora(model):
 
     for name, _module in model.named_modules():
         if _module.__class__.__name__ in ["LoraInjectedLinear", "LoraInjectedConv2d"]:
+            # get the up and down weight matrices:
             ups = _module.lora_up.weight.data.clone()
             downs = _module.lora_down.weight.data.clone()
-
+            
+            # flatten and compute dot product:
             wght: torch.Tensor = ups.flatten(1) @ downs.flatten(1)
-
+            # get the mean of the absolute value of the dot product:
             dist = wght.flatten().abs().mean().item()
+
             if name in moved:
                 moved[name].append(dist)
             else:
                 moved[name] = [dist]
-
     return moved
 
 
