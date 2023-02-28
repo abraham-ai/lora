@@ -330,7 +330,7 @@ class PivotalTuningDatasetCapation(Dataset):
         self.h_flip = h_flip
         self.image_transforms = transforms.Compose(
             [
-                transforms.RandomAffine(degrees=0, translate=(0, 0), scale=(1.0, 1.2)),
+                transforms.RandomAffine(degrees=0, translate=(0, 0), scale=(1.0, 1.25)),
                 transforms.Resize(
                     size, interpolation=transforms.InterpolationMode.BILINEAR
                 )

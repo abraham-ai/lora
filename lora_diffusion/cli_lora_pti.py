@@ -32,6 +32,7 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 from tqdm.auto import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
+from safetensors.torch import safe_open
 import wandb
 import fire
 
@@ -123,6 +124,7 @@ def get_models(
     placeholder_tokens: List[str],
     initializer_tokens: List[str],
     device="cuda:0",
+    local_files_only=False,
 ):
 
     tokenizer = CLIPTokenizer.from_pretrained(
@@ -187,13 +189,13 @@ def get_models(
         pretrained_vae_name_or_path or pretrained_model_name_or_path,
         subfolder=None if pretrained_vae_name_or_path else "vae",
         revision=None if pretrained_vae_name_or_path else revision,
-        local_files_only = True,
+        local_files_only = local_files_only,
     )
     unet = UNet2DConditionModel.from_pretrained(
         pretrained_model_name_or_path,
         subfolder="unet",
         revision=revision,
-        local_files_only = True,
+        local_files_only = local_files_only,
     )
 
     return (
@@ -836,7 +838,6 @@ def train(
     placeholder_tokens: str = "",
     placeholder_token_at_data: Optional[str] = None,
     initializer_tokens: Optional[str] = None,
-    load_pretrained_inversion_embeddings_path: Optional[str] = None,
     seed: int = 42,
     resolution: int = 512,
     color_jitter: bool = True,
@@ -881,6 +882,8 @@ def train(
     proxy_token: str = "person",
     enable_xformers_memory_efficient_attention: bool = False,
     out_name: str = "final_lora",
+    local_files_only = False,
+    load_pretrained_inversion_embeddings_path: Optional[str] = None,
 ):
     script_start_time = time.time()
     torch.manual_seed(seed)
@@ -891,6 +894,7 @@ def train(
 
     # Get a dict with all the arguments:
     args_dict = locals()
+    print(args_dict)
 
     if log_wandb:
         wandb.init(
@@ -948,11 +952,12 @@ def train(
         placeholder_tokens,
         initializer_tokens,
         device=device,
+        local_files_only=local_files_only
     )
 
     noise_scheduler = DDPMScheduler.from_config(
         pretrained_model_name_or_path, subfolder="scheduler", 
-        local_files_only = True,
+        local_files_only = local_files_only,
     )
 
     if gradient_checkpointing:
@@ -1026,8 +1031,35 @@ def train(
     if cached_latents:
         vae = None
 
+    # Step 0: Optionally load pretrained inversion embeddings
+    if load_pretrained_inversion_embeddings_path is not None:
+
+        print("PTI : Loading pretrained inversion embeddings..")
+
+        if load_pretrained_inversion_embeddings_path.endswith("safetensors"):
+            # Load the pretrained embeddings from the lora file:
+            safeloras = safe_open(load_pretrained_inversion_embeddings_path, framework="pt", device="cpu")
+            tok_dict = parse_safeloras_embeds(safeloras)
+        else: 
+            embedding = torch.load(load_pretrained_inversion_embeddings_path)
+            tok_dict = {k: v for k, v in zip(placeholder_tokens, embedding)}
+
+        for k, v in tok_dict.items(): # add a little bit of noise to the embeddings:
+            tok_dict[k] = v + torch.randn_like(v) * (0.017 / 10)
+            print(k, v.shape)
+
+        apply_learned_embed_in_clip(
+                tok_dict,
+                text_encoder,
+                tokenizer,
+                idempotent=True,
+            )
+
+        max_train_steps_ti = max_train_steps_ti // 2
+
+
     # STEP 1 : Perform Inversion
-    if perform_inversion and not cached_latents and (load_pretrained_inversion_embeddings_path is None):
+    if perform_inversion and not cached_latents:
         preview_training_batch(train_dataloader, "inversion")
 
         print("PTI : Performing Inversion")
@@ -1077,21 +1109,6 @@ def train(
 
         del ti_optimizer
         print("###############  Inversion Done  ###############")
-
-    elif load_pretrained_inversion_embeddings_path is not None:
-
-        print("PTI : Loading pretrained inversion embeddings..")
-        from safetensors.torch import safe_open
-        # Load the pretrained embeddings from the lora file:
-        safeloras = safe_open(load_pretrained_inversion_embeddings_path, framework="pt", device="cpu")
-        #monkeypatch_or_replace_safeloras(pipe, safeloras)
-        tok_dict = parse_safeloras_embeds(safeloras)
-        apply_learned_embed_in_clip(
-                tok_dict,
-                text_encoder,
-                tokenizer,
-                idempotent=True,
-            )
 
     # Next perform Tuning with LoRA:
     if not use_extended_lora:
