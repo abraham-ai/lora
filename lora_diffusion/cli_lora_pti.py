@@ -257,7 +257,7 @@ def text2img_dataloader(
         train_dataloader = torch.utils.data.DataLoader(
             cached_latents_dataset,
             batch_size=train_batch_size,
-            num_workers=4,
+            # num_workers=4,
             shuffle=True,
             collate_fn=collate_fn,
         )
@@ -268,7 +268,7 @@ def text2img_dataloader(
         train_dataloader = torch.utils.data.DataLoader(
             train_dataset,
             batch_size=train_batch_size,
-            num_workers=4,
+            # num_workers=4,
             shuffle=True,
             collate_fn=collate_fn,
         )
@@ -330,7 +330,7 @@ def inpainting_dataloader(
 
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
-        num_workers = 4,
+        # num_workers = 4,
         batch_size=train_batch_size,
         shuffle=True,
         collate_fn=collate_fn,

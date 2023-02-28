@@ -1,6 +1,7 @@
 training_batch_preview/
 .huggingface
 .torch
+.cog
 data_*
 output_*
 __pycache__
