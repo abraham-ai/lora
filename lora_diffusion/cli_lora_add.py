@@ -111,7 +111,6 @@ def add(
                     ret_tensor[keys] = tens
                 else:
                     if keys in safeloras_1.keys():
-
                         tens1 = safeloras_1.get_tensor(keys)
                     else:
                         tens1 = safeloras_2.get_tensor(keys)

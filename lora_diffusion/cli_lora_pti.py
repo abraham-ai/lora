@@ -965,9 +965,11 @@ def train(
 
     if enable_xformers_memory_efficient_attention:
         from diffusers.utils.import_utils import is_xformers_available
-
+        
         if is_xformers_available():
-            unet.enable_xformers_memory_efficient_attention()
+            #unet.enable_xformers_memory_efficient_attention()
+            from diffusers.models.cross_attention import AttnProcessor2_0
+            unet.set_attn_processor(AttnProcessor2_0())
         else:
             raise ValueError(
                 "xformers is not available. Make sure it is installed correctly"

@@ -1,4 +1,5 @@
 import random
+import os
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
@@ -59,7 +60,7 @@ PERSON_TEMPLATE = [
     "a selfie taken by {}",
     "{} taking a selfie",
     "{} is having fun, 4k photograph",
-    "{} wearing a plaidered shirt standing next to another person",
+    "{} standing next to another person",
     "smiling {} in a hoodie and sweater",
     "{} smiling at the camera",
     "a photo of the cool {}",
@@ -70,6 +71,13 @@ PERSON_TEMPLATE = [
     "a beautiful picture of {}",
     "a photo showing {}",
     "a great photo of {}",
+    "a candid shot of {}",
+    "{} posing for the camera",
+    "an artistic photo of {}",
+    "a photo of {} at an event",
+    "a casual photo of {}",
+    "a photo of {} during a trip",
+    "{} in their favorite spot",
 ]
 
 STYLE_TEMPLATE_ORIG = [
@@ -229,20 +237,33 @@ class PivotalTuningDatasetCapation(Dataset):
 
         # Prepare the instance images
         if use_mask_captioned_data:
-            src_imgs = glob.glob(str(instance_data_root) + "/*src.jpg")
-            src_imgs = sorted(src_imgs, key=lambda x: int(str(Path(x).stem).split(".")[0]))
+            src_imgs = glob.glob(str(instance_data_root) + "/*.jpg")
+            src_imgs = sorted(src_imgs)
 
-            for f in src_imgs:
-                idx = int(str(Path(f).stem).split(".")[0])
-                mask_path = f"{instance_data_root}/{idx}.mask.png"
-
-                if Path(mask_path).exists():
+            try:            
+                for f in src_imgs:
+                    idx = int(str(Path(f).stem).split(".")[0])
+                    mask_path = f"{instance_data_root}/{idx}.mask.png"
                     self.instance_images_path.append(f)
-                    self.mask_path.append(mask_path)
-                else:
-                    print(f"Mask not found for {f}")
 
-            self.captions = open(f"{instance_data_root}/caption.txt").readlines()
+                    if Path(mask_path).exists():
+                        self.mask_path.append(mask_path)
+                    else:
+                        print(f"Mask not found for {f}")
+
+                self.captions = open(f"{instance_data_root}/caption.txt").readlines()
+            except:
+                # No captions.txt file found, try using the image names:
+                self.captions = []
+                for f in src_imgs:
+                    self.instance_images_path.append(f)
+                    txt_path = f"{instance_data_root}/{Path(f).stem}.txt"
+                    if Path(txt_path).exists():
+                        self.captions.append(open(txt_path).readline())
+                    else:
+                        print("No .txt file found for ", f)
+                        self.captions.append("")
+
 
         else:
             possibily_src_images = (
@@ -266,10 +287,9 @@ class PivotalTuningDatasetCapation(Dataset):
         ), "No images found in the instance data root."
 
         self.instance_images_path = sorted(self.instance_images_path)
-
         self.use_mask = use_face_segmentation_condition or use_mask_captioned_data
         self.use_mask_captioned_data = use_mask_captioned_data
-
+        
         if use_face_segmentation_condition:
 
             for idx in range(len(self.instance_images_path)):
@@ -318,6 +338,9 @@ class PivotalTuningDatasetCapation(Dataset):
         # self.mask_path
         # self.captions
 
+        if self.use_mask:
+            assert len(self.mask_path) == len(self.instance_images_path), "Mask path and instance images path should be of same length."
+
         self.num_instance_images = len(self.instance_images_path)
         self.token_map = token_map
 
@@ -339,7 +362,8 @@ class PivotalTuningDatasetCapation(Dataset):
                 transforms.ColorJitter(0.1, 0.1, 0.02, 0.02)
                 if color_jitter
                 else transforms.Lambda(lambda x: x),
-                transforms.CenterCrop(size),
+                #transforms.CenterCrop(size),
+                transforms.RandomCrop(size),
                 transforms.ToTensor(),
                 transforms.Normalize([0.5], [0.5]),
             ]
@@ -347,13 +371,10 @@ class PivotalTuningDatasetCapation(Dataset):
 
         self.instance_images = []
 
-        if len(self.instance_images_path) < 20:
+        if len(self.instance_images_path) < 200:
             # Load all the images into memory:
             for f in self.instance_images_path:
                 self.instance_images.append(Image.open(f).convert("RGB"))
-
-        print("Captions:")
-        print(self.captions)
 
     def tune_h_flip_prob(self, training_progress):
         if self.h_flip:
@@ -369,9 +390,15 @@ class PivotalTuningDatasetCapation(Dataset):
         if len(self.instance_images) > 0:
             instance_image = self.instance_images[index % self.num_instance_images]
         else:
-            instance_image = Image.open(
-                self.instance_images_path[index % self.num_instance_images]
-            ).convert("RGB")
+            try:
+                instance_image = Image.open(
+                    self.instance_images_path[index % self.num_instance_images]
+                ).convert("RGB")
+            except: # load the next img:
+                print("Error loading (removing file from disk):")
+                print(self.instance_images_path[index % self.num_instance_images])
+                os.remove(self.instance_images_path[index % self.num_instance_images])
+                return self.__getitem__((index+1)% self.num_instance_images)
 
         example["instance_images"] = self.image_transforms(instance_image)
 
