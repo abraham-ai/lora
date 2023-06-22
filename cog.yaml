@@ -10,7 +10,7 @@ build:
   python_packages:
     - "git+https://www.github.com/abraham-ai/diffusers"
     - "torch==2.0.1"
-    - "torchvision==0.14.1"
+    - "torchvision"
     - "ftfy==6.1.1"
     - "scipy==1.10.0"
     - "accelerate==0.16.0"
@@ -21,7 +21,7 @@ build:
     - "mediapipe==0.9.1.0"
     - "scikit-image==0.19.3"
     - "tokenizers==0.13.2"
-    - "triton==2.0.0a1"
+    - "triton"
     - "apache-beam==2.45.0"
     - "natsort==8.2.0"
     - "mediapy==1.1.4"
