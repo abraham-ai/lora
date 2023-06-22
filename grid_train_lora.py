@@ -227,7 +227,7 @@ nohup python grid_train_lora.py &
 
 if 1: # Person SLOW
   input_dir  = "/home/xander/Projects/cog/lora/exps/training_imgs/hetty"
-  output_directory = "hetty_lora"
+  output_directory = "hetty_eden_lora"
 
   subdir_paths = [os.path.join(input_dir, f) for f in sorted(os.listdir(input_dir)) if os.path.isdir(os.path.join(input_dir, f))]
   training_dirs = [os.path.join(f, "train") for f in subdir_paths]
@@ -237,7 +237,8 @@ if 1: # Person SLOW
     print(f)
 
   param_grid = {
-    'pretrained_model_name_or_path': ['dreamlike-art/dreamlike-photoreal-2.0'],
+    #'pretrained_model_name_or_path': ['dreamlike-art/dreamlike-photoreal-2.0'],
+    'pretrained_model_name_or_path': ['/home/xander/Projects/cog/eden-sd-pipelines/models/checkpoints/eden:eden-v1'],
     'instance_data_dir':             "",
 
     'train_text_encoder':            True,
