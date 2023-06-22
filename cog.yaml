@@ -9,7 +9,7 @@ build:
 
   python_packages:
     - "git+https://www.github.com/abraham-ai/diffusers"
-    - "torch==1.13.1"
+    - "torch==2.0.1"
     - "torchvision==0.14.1"
     - "ftfy==6.1.1"
     - "scipy==1.10.0"
