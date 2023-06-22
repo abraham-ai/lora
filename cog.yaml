@@ -20,7 +20,6 @@ build:
     - "safetensors==0.2.8"
     - "mediapipe==0.9.1.0"
     - "scikit-image==0.19.3"
-    - "xformers==0.0.17.dev464"
     - "tokenizers==0.13.2"
     - "triton==2.0.0a1"
     - "apache-beam==2.45.0"
