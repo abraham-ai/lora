@@ -184,7 +184,7 @@ class Predictor(BasePredictor):
         print("cog:predict:")
 
         # map the checkpoint key to checkpoint path:
-        checkpoint = checkpoint_options[checkpoint]
+        checkpoint_path = checkpoint_options[checkpoint]
 
         data_dir = Path(tempfile.mkdtemp())
         out_dir = Path(tempfile.mkdtemp())
@@ -214,7 +214,7 @@ class Predictor(BasePredictor):
         train(
             instance_data_dir = str(data_dir) + "/train",
             output_dir = str(out_dir),
-            pretrained_model_name_or_path = checkpoint,
+            pretrained_model_name_or_path = checkpoint_path,
             out_name = name,            
             train_text_encoder = train_text_encoder,
             perform_inversion = perform_inversion,
