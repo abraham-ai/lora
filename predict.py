@@ -27,12 +27,9 @@ from cog import BasePredictor, BaseModel, File, Input, Path
 
 EDEN_v1_abspath = "/src/models/checkpoints/eden:eden-v1"
 
-checkpoint_options = [
-    "runwayml/stable-diffusion-v1-5",
-    "prompthero/openjourney-v2",
-    "dreamlike-art/dreamlike-photoreal-2.0",
-    EDEN_v1_abspath
-]
+checkpoint_options = {
+    "eden:eden-v1": EDEN_v1_abspath,
+}
 
 class CogOutput(BaseModel):
     file: Path
@@ -65,8 +62,8 @@ class Predictor(BasePredictor):
         
         checkpoint: str = Input(
             description="Which Stable Diffusion checkpoint to use",
-            choices=checkpoint_options,
-            default=EDEN_v1_abspath
+            choices=checkpoint_options.keys(),
+            default=checkpoint_options["eden:eden-v1"]
         ),
         lora_training_urls: str = Input(
             description="Training images for new LORA concept", 
