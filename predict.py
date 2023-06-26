@@ -63,7 +63,7 @@ class Predictor(BasePredictor):
         checkpoint: str = Input(
             description="Which Stable Diffusion checkpoint to use",
             choices=checkpoint_options.keys(),
-            default=checkpoint_options["eden:eden-v1"]
+            default="eden:eden-v1"
         ),
         lora_training_urls: str = Input(
             description="Training images for new LORA concept", 
@@ -182,6 +182,9 @@ class Predictor(BasePredictor):
     ) -> Iterator[CogOutput]:
 
         print("cog:predict:")
+
+        # map the checkpoint key to checkpoint path:
+        checkpoint = checkpoint_options[checkpoint]
 
         data_dir = Path(tempfile.mkdtemp())
         out_dir = Path(tempfile.mkdtemp())
